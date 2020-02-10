@@ -486,6 +486,7 @@ typedef enum {
 typedef enum {
     // Alphanumeric keys
     KEY_APOSTROPHE      = 39,
+    KEY_PLUS            = 43,
     KEY_COMMA           = 44,
     KEY_MINUS           = 45,
     KEY_PERIOD          = 46,
