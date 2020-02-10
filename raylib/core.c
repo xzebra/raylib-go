@@ -499,6 +499,7 @@ static void WindowDropCallback(GLFWwindow *window, int count, const char **paths
 #if defined(PLATFORM_ANDROID)
 static void AndroidCommandCallback(struct android_app *app, int32_t cmd);                  // Process Android activity lifecycle commands
 static int32_t AndroidInputCallback(struct android_app *app, AInputEvent *event);          // Process Android inputs
+void SetAndroidKeyboard(int show);
 #endif
 
 #if defined(PLATFORM_WEB)
@@ -4258,6 +4259,12 @@ static int32_t AndroidInputCallback(struct android_app *app, AInputEvent *event)
 
     return 0;
 }
+
+void SetAndroidKeyboard(int show) {
+    if(show != 0) ANativeActivity_showSoftInput(androidApp->activity, ANATIVEACTIVITY_SHOW_SOFT_INPUT_FORCED);
+    else ANativeActivity_hideSoftInput(androidApp->activity, ANATIVEACTIVITY_HIDE_SOFT_NOT_ALWAYS);
+}
+
 #endif
 
 #if defined(PLATFORM_WEB)

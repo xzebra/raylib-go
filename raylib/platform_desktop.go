@@ -29,6 +29,10 @@ func SetCallbackFunc(func()) {
 	return
 }
 
+func ShowKeyboard(show bool) {
+	return
+}
+
 // ShowCursor - Shows cursor
 func ShowCursor() {
 	C.ShowCursor()
