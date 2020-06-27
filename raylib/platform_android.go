@@ -4,6 +4,7 @@ package rl
 
 /*
 #include "raylib.h"
+#include <stdlib.h>
 #include <android/asset_manager.h>
 #include <android_native_app_glue.h>
 
@@ -43,6 +44,14 @@ func SetCallbackFunc(callback func()) {
 func android_run() {
 	if callbackHolder != nil {
 		callbackHolder()
+	}
+}
+
+func ShowKeyboard(show bool) {
+	if show {
+		C.SetAndroidKeyboard((C.int)(1))
+	} else {
+		C.SetAndroidKeyboard((C.int)(0))
 	}
 }
 

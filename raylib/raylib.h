@@ -486,6 +486,7 @@ typedef enum {
 typedef enum {
     // Alphanumeric keys
     KEY_APOSTROPHE      = 39,
+    KEY_PLUS            = 43,
     KEY_COMMA           = 44,
     KEY_MINUS           = 45,
     KEY_PERIOD          = 46,
@@ -977,6 +978,7 @@ RLAPI bool IsKeyReleased(int key);                            // Detect if a key
 RLAPI bool IsKeyUp(int key);                                  // Detect if a key is NOT being pressed
 RLAPI void SetExitKey(int key);                               // Set a custom key to exit program (default is ESC)
 RLAPI int GetKeyPressed(void);                                // Get key pressed, call it multiple times for chars queued
+RLAPI void SetAndroidKeyboard(int show);                      // Show Android soft keyboard
 
 // Input-related functions: gamepads
 RLAPI bool IsGamepadAvailable(int gamepad);                   // Detect if a gamepad is available
