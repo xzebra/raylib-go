@@ -711,3 +711,15 @@ func GetTouchPosition(index int32) Vector2 {
 	v := newVector2FromPointer(unsafe.Pointer(&ret))
 	return v
 }
+
+func GetDisplayWidth() int32 {
+	ret := C.GetDisplayWidth()
+	v := (int32)(ret)
+	return v
+}
+
+func GetDisplayHeight() int32 {
+	ret := C.GetDisplayHeight()
+	v := (int32)(ret)
+	return v
+}
