@@ -89,6 +89,7 @@ func IsWindowHidden() bool {
 	v := bool(ret)
 	return v
 }
+
 // ToggleFullscreen - Fullscreen toggle (only PLATFORM_DESKTOP)
 func ToggleFullscreen() {
 	C.ToggleFullscreen()
@@ -300,10 +301,36 @@ func GetWorldToScreen(position Vector3, camera Camera) Vector2 {
 	return v
 }
 
+// GetWorldToScreen2D - Returns the screen space position for a 2d camera world space position
+func GetWorldToScreen2D(position Vector2, camera Camera2D) Vector2 {
+	cposition := position.cptr()
+	ccamera := camera.cptr()
+	ret := C.GetWorldToScreen2D(*cposition, *ccamera)
+	v := newVector2FromPointer(unsafe.Pointer(&ret))
+	return v
+}
+
+// GetScreenToWorld2D - Returns the world space position for a 2d camera screen space position
+func GetScreenToWorld2D(position Vector2, camera Camera2D) Vector2 {
+	cposition := position.cptr()
+	ccamera := camera.cptr()
+	ret := C.GetScreenToWorld2D(*cposition, *ccamera)
+	v := newVector2FromPointer(unsafe.Pointer(&ret))
+	return v
+}
+
 // GetCameraMatrix - Returns camera transform matrix (view matrix)
 func GetCameraMatrix(camera Camera) Matrix {
 	ccamera := camera.cptr()
 	ret := C.GetCameraMatrix(*ccamera)
+	v := newMatrixFromPointer(unsafe.Pointer(&ret))
+	return v
+}
+
+// GetCameraMatrix2D - Returns camera 2d transform matrix
+func GetCameraMatrix2D(camera Camera2D) Matrix {
+	ccamera := camera.cptr()
+	ret := C.GetCameraMatrix2D(*ccamera)
 	v := newMatrixFromPointer(unsafe.Pointer(&ret))
 	return v
 }
@@ -436,17 +463,17 @@ func TakeScreenshot(name string) {
 	C.TakeScreenshot(cname)
 }
 
-// StorageSaveValue - Storage save integer value (to defined position)
-func StorageSaveValue(position, value int32) {
-	cposition := (C.int)(position)
+// SaveStorageValue - Storage save integer value (to defined position)
+func SaveStorageValue(position, value int32) {
+	cposition := (C.uint)(position)
 	cvalue := (C.int)(value)
-	C.StorageSaveValue(cposition, cvalue)
+	C.SaveStorageValue(cposition, cvalue)
 }
 
-// StorageLoadValue - Storage load integer value (from defined position)
-func StorageLoadValue(position int32) int32 {
-	cposition := (C.int)(position)
-	ret := C.StorageLoadValue(cposition)
+// LoadStorageValue - Storage load integer value (from defined position)
+func LoadStorageValue(position int32) int32 {
+	cposition := (C.uint)(position)
+	ret := C.LoadStorageValue(cposition)
 	v := (int32)(ret)
 	return v
 }
