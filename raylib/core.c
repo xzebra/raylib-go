@@ -4754,6 +4754,49 @@ static void AndroidCommandCallback(struct android_app *app, int32_t cmd) {
   }
 }
 
+// getUnicodeChar gets unicode equivalent to Android's keyCode (also supporting
+// meta-keys).
+int getUnicodeChar(int eventType, int keyCode, int metaState) {
+  JavaVM *vm = CORE.Android.app->activity->vm;
+  JNIEnv *env;
+
+  JavaVMAttachArgs vmArgs;
+  vmArgs.version = JNI_VERSION_1_6;
+  vmArgs.name = "NativeThread";
+  vmArgs.group = NULL;
+
+  if ((*vm)->AttachCurrentThread(vm, &env, &vmArgs) == JNI_ERR)
+    return 0;
+
+  jclass class_key_event = (*env)->FindClass(env, "android/view/KeyEvent");
+  int unicodeKey;
+
+  if (metaState == 0) {
+    jmethodID method_get_unicode_char =
+        (*env)->GetMethodID(env, class_key_event, "getUnicodeChar", "()I");
+    jmethodID eventConstructor =
+        (*env)->GetMethodID(env, class_key_event, "<init>", "(II)V");
+    jobject eventObj = (*env)->NewObject(env, class_key_event, eventConstructor,
+                                         eventType, keyCode);
+
+    unicodeKey = (*env)->CallIntMethod(env, eventObj, method_get_unicode_char);
+  } else {
+    jmethodID method_get_unicode_char =
+        (*env)->GetMethodID(env, class_key_event, "getUnicodeChar", "(I)I");
+    jmethodID eventConstructor =
+        (*env)->GetMethodID(env, class_key_event, "<init>", "(II)V");
+    jobject eventObj = (*env)->NewObject(env, class_key_event, eventConstructor,
+                                         eventType, keyCode);
+
+    unicodeKey = (*env)->CallIntMethod(env, eventObj, method_get_unicode_char,
+                                       metaState);
+  }
+
+  (*vm)->DetachCurrentThread(vm);
+
+  return unicodeKey;
+}
+
 // ANDROID: Get input events
 static int32_t AndroidInputCallback(struct android_app *app,
                                     AInputEvent *event) {
@@ -4791,18 +4834,30 @@ static int32_t AndroidInputCallback(struct android_app *app,
     }
   } else if (type == AINPUT_EVENT_TYPE_KEY) {
     int32_t keycode = AKeyEvent_getKeyCode(event);
+    int32_t metaState = AKeyEvent_getMetaState(event);
+
+    int32_t action = AKeyEvent_getAction(event);
+
+    int32_t uniValue;
+
+    if (keycode == AKEYCODE_DEL)
+      uniValue = KEY_BACKSPACE;
+    else if (keycode == AKEYCODE_ENTER)
+      uniValue = KEY_ENTER;
+    else
+      uniValue = getUnicodeChar(action, keycode, metaState);
     // int32_t AKeyEvent_getMetaState(event);
 
     // Save current button and its state
     // NOTE: Android key action is 0 for down and 1 for up
-    if (AKeyEvent_getAction(event) == AKEY_EVENT_ACTION_DOWN) {
-      CORE.Input.Keyboard.currentKeyState[keycode] = 1; // Key down
+    if (action == AKEY_EVENT_ACTION_DOWN) {
+      CORE.Input.Keyboard.currentKeyState[uniValue] = 1; // Key down
 
       CORE.Input.Keyboard
-          .keyPressedQueue[CORE.Input.Keyboard.keyPressedQueueCount] = keycode;
+          .keyPressedQueue[CORE.Input.Keyboard.keyPressedQueueCount] = uniValue;
       CORE.Input.Keyboard.keyPressedQueueCount++;
     } else
-      CORE.Input.Keyboard.currentKeyState[keycode] = 0; // Key up
+      CORE.Input.Keyboard.currentKeyState[uniValue] = 0; // Key up
 
     if (keycode == AKEYCODE_POWER) {
       // Let the OS handle input to avoid app stuck. Behaviour: CMD_PAUSE ->
@@ -5877,12 +5932,107 @@ static void *GamepadThread(void *arg) {
 
 void SetAndroidKeyboard(int show) {
 #if defined(PLATFORM_ANDROID)
-  if (show != 0)
-    ANativeActivity_showSoftInput(CORE.Android.app->activity,
-                                  ANATIVEACTIVITY_SHOW_SOFT_INPUT_FORCED);
-  else
-    ANativeActivity_hideSoftInput(CORE.Android.app->activity,
-                                  ANATIVEACTIVITY_HIDE_SOFT_INPUT_NOT_ALWAYS);
+  /* if (show != 0) */
+  /*   ANativeActivity_showSoftInput(CORE.Android.app->activity, */
+  /*                                 ANATIVEACTIVITY_SHOW_SOFT_INPUT_FORCED); */
+  /* else */
+  /*   ANativeActivity_hideSoftInput(CORE.Android.app->activity, */
+  /*                                 ANATIVEACTIVITY_HIDE_SOFT_INPUT_NOT_ALWAYS);
+   */
+  jint IResult;
+  jint IFlags = 0;
+  JavaVM *vm = CORE.Android.app->activity->vm;
+  JNIEnv *env;
+
+  JavaVMAttachArgs vmArgs;
+  vmArgs.version = JNI_VERSION_1_6;
+  vmArgs.name = "NativeThread";
+  vmArgs.group = NULL;
+
+  bool attached = false;
+  switch ((*vm)->GetEnv(vm, (void **)&env, JNI_VERSION_1_6)) {
+  case JNI_OK:
+    break;
+  case JNI_EDETACHED:
+    IResult = (*vm)->AttachCurrentThread(vm, &env, &vmArgs);
+    if (IResult == JNI_ERR) {
+      TRACELOG(LOG_WARNING, "ANDROID: couldn't attach current thread");
+      return;
+    }
+    attached = true;
+    break;
+  case JNI_EVERSION:
+    TRACELOG(LOG_WARNING, "ANDROID: invalid java version");
+    return;
+  }
+
+  if (!attached)
+    return;
+
+  // Retrieves NativeActivity
+  jobject INativeActivity = CORE.Android.app->activity->clazz;
+  jclass ClassNativeActivity = (*env)->GetObjectClass(env, INativeActivity);
+
+  // Retrieves Context.INPUT_METHOD_SERVICE
+  jclass ClassContext = (*env)->FindClass(env, "android/content/Context");
+  jfieldID FieldINPUT_METHOD_SERVICE = (*env)->GetStaticFieldID(
+      env, ClassContext, "INPUT_METHOD_SERVICE", "Ljava/lang/String;");
+  jobject INPUT_METHOD_SERVICE = (*env)->GetStaticObjectField(
+      env, ClassContext, FieldINPUT_METHOD_SERVICE);
+  /* jniCheck(INPUT_METHOD_SERVICE); */
+
+  // Runs getSystemService(Context.INPUT_METHOD_SERVICE)
+  jclass ClassInputMethodManager =
+      (*env)->FindClass(env, "android/view/inputmethod/InputMethodManager");
+  jmethodID MethodGetSystemService =
+      (*env)->GetMethodID(env, ClassNativeActivity, "getSystemService",
+                          "(Ljava/lang/String;)Ljava/lang/Object;");
+  jobject IInputMethodManager = (*env)->CallObjectMethod(
+      env, INativeActivity, MethodGetSystemService, INPUT_METHOD_SERVICE);
+
+  // Runs getWindow().getDecorView()
+  jmethodID MethodGetWindow = (*env)->GetMethodID(
+      env, ClassNativeActivity, "getWindow", "()Landroid/view/Window;");
+  jobject IWindow =
+      (*env)->CallObjectMethod(env, INativeActivity, MethodGetWindow);
+  jclass ClassWindow = (*env)->FindClass(env, "android/view/Window");
+  jmethodID MethodGetDecorView = (*env)->GetMethodID(
+      env, ClassWindow, "getDecorView", "()Landroid/view/View;");
+  jobject IDecorView =
+      (*env)->CallObjectMethod(env, IWindow, MethodGetDecorView);
+
+  if (show) {
+    TRACELOG(LOG_WARNING, "ANDROID-DEBUG: showing keyboard");
+    // Runs IInputMethodManager.showSoftInput(...)
+    jmethodID MethodShowSoftInput =
+        (*env)->GetMethodID(env, ClassInputMethodManager, "showSoftInput",
+                            "(Landroid/view/View;I)Z");
+    jboolean IResult = (*env)->CallBooleanMethod(
+        env, IInputMethodManager, MethodShowSoftInput, IDecorView, IFlags);
+  } else {
+    TRACELOG(LOG_WARNING, "ANDROID-DEBUG: closing keyboard");
+    // Runs IWindow.getViewToken()
+    jclass ClassView = (*env)->FindClass(env, "android/view/View");
+    jmethodID MethodGetWindowToken = (*env)->GetMethodID(
+        env, ClassView, "getWindowToken", "()Landroid/os/IBinder;");
+    jobject IBinder =
+        (*env)->CallObjectMethod(env, IDecorView, MethodGetWindowToken);
+
+    /* // IInputMethodManager.hideShoftInput(...) */
+    jmethodID MethodHideSoftInput = (*env)->GetMethodID(
+        env, ClassInputMethodManager, "hideSoftInputFromWindow",
+        "(Landroid/os/IBinder;I)Z");
+    jboolean IRes = (*env)->CallBooleanMethod(
+        env, IInputMethodManager, MethodHideSoftInput, IBinder, IFlags);
+    jmethodID MethodShowSoftInput =
+        (*env)->GetMethodID(env, ClassInputMethodManager, "showSoftInput",
+                            "(Landroid/view/View;I)Z");
+    jboolean IResult = (*env)->CallBooleanMethod(
+        env, IInputMethodManager, MethodShowSoftInput, IDecorView, IFlags);
+  }
+
+  // Finished with the JVM
+  (*vm)->DetachCurrentThread(vm);
 #endif
 }
 
