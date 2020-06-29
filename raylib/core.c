@@ -4380,8 +4380,8 @@ static void PollInputEvents(void) {
 
 #if defined(PLATFORM_ANDROID)
   // Register previous keys states
-  // NOTE: Android supports up to 260 keys
-  for (int i = 0; i < 260; i++)
+  // NOTE: Android supports up to 260 keys but we use raylib.h keycodes.
+  for (int i = 0; i < 512; i++)
     CORE.Input.Keyboard.previousKeyState[i] =
         CORE.Input.Keyboard.currentKeyState[i];
 
@@ -4839,25 +4839,33 @@ static int32_t AndroidInputCallback(struct android_app *app,
     int32_t action = AKeyEvent_getAction(event);
 
     int32_t uniValue;
+    int addToQueue = false;
 
-    if (keycode == AKEYCODE_DEL)
+    if (keycode == AKEYCODE_DEL) {
       uniValue = KEY_BACKSPACE;
-    else if (keycode == AKEYCODE_ENTER)
+    } else if (keycode == AKEYCODE_ENTER)
       uniValue = KEY_ENTER;
-    else
+    else {
       uniValue = getUnicodeChar(action, keycode, metaState);
+      addToQueue = true;
+    }
     // int32_t AKeyEvent_getMetaState(event);
 
     // Save current button and its state
     // NOTE: Android key action is 0 for down and 1 for up
     if (action == AKEY_EVENT_ACTION_DOWN) {
-      CORE.Input.Keyboard.currentKeyState[uniValue] = 1; // Key down
+      CORE.Input.Keyboard.previousKeyState[uniValue] = 0; // Key up
+      CORE.Input.Keyboard.currentKeyState[uniValue] = 1;  // Key down
 
-      CORE.Input.Keyboard
-          .keyPressedQueue[CORE.Input.Keyboard.keyPressedQueueCount] = uniValue;
-      CORE.Input.Keyboard.keyPressedQueueCount++;
-    } else
-      CORE.Input.Keyboard.currentKeyState[uniValue] = 0; // Key up
+      if (addToQueue) {
+        CORE.Input.Keyboard
+            .keyPressedQueue[CORE.Input.Keyboard.keyPressedQueueCount] =
+            uniValue;
+        CORE.Input.Keyboard.keyPressedQueueCount++;
+      }
+    } else {
+      /* CORE.Input.Keyboard.currentKeyState[uniValue] = 0; // Key up */
+    }
 
     if (keycode == AKEYCODE_POWER) {
       // Let the OS handle input to avoid app stuck. Behaviour: CMD_PAUSE ->
