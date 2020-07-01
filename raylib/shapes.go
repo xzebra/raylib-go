@@ -188,7 +188,7 @@ func DrawRectangleRounded(rec Rectangle, roundness float32, segments int32, colo
 }
 
 // Draw rectangle with rounded edges outline
-func DrawRectangleRoundedLines(rec Rectangle, roundness float32, segments int32, lineThick int, color Color) {
+func DrawRectangleRoundedLines(rec Rectangle, roundness float32, segments int32, lineThick int32, color Color) {
 	crec := rec.cptr()
 	croundness := (C.float)(roundness)
 	csegments := (C.int)(segments)
